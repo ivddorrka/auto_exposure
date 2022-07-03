@@ -89,12 +89,10 @@ class ExposureControl : public nodelet::Nodelet {
 
   // | --------------- variables for exposure -------------- |
 
-  int low_exposure = 0;
   int max_exposure = 10000;
   int exposure_slider_value = 1000.0;
   double shutter_speed = 1000.0;
   const double  shutter_speed_default = 1000.0;
-  
   // | ----------------------- publishers ----------------------- |
 
   ros::Publisher             pub_test_;
@@ -366,8 +364,6 @@ bool ExposureControl::callbackIncreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
 
   return true;
 }
-
-
 
 
 }
