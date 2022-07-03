@@ -129,7 +129,7 @@ void ExposureControl::onInit() {
   // | ------------------- load ros parameters ------------------ |
   /* (mrs_lib implementation checks whether the parameter was loaded or not) */
 
-  mrs_lib::ParamLoader param_loader(nh, "EdgeDetect");
+  mrs_lib::ParamLoader param_loader(nh, "ExposureControl");
 
   param_loader.loadParam("UAV_NAME", _uav_name_);
   param_loader.loadParam("gui", _gui_);
@@ -143,7 +143,7 @@ void ExposureControl::onInit() {
 
   // | --------------------- tf transformer --------------------- |
 
-  transformer_ = std::make_unique<mrs_lib::Transformer>("EdgeDetect");
+  transformer_ = std::make_unique<mrs_lib::Transformer>("ExposureControl");
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->retryLookupNewest(true);
 
