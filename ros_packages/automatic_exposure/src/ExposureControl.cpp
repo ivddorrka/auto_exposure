@@ -87,16 +87,14 @@ class ExposureControl : public nodelet::Nodelet {
   bool       got_image_       = false;  // indicates whether at least one image message was received
   bool       got_camera_info_ = false;  // indicates whether at least one camera info message was received
 
-  // | --------------- variables for edge detector -------------- |
+  // | --------------- variables for exposure -------------- |
 
-  int       low_threshold_;
-  int const max_low_threshold_ = 100;
-
-  // | ------------- variables for point projection ------------- |
-  double  shutter_speed = 1000.0;
-  tf2_ros::Buffer                             tf_buffer_;
-  std::unique_ptr<tf2_ros::TransformListener> tf_listener_ptr_;
-
+  int low_exposure = 0;
+  int max_exposure = 10000;
+  int exposure_slider_value = 1000.0;
+  double shutter_speed = 1000.0;
+  const double  shutter_speed_default = 1000.0;
+  
   // | ----------------------- publishers ----------------------- |
 
   ros::Publisher             pub_test_;
@@ -112,6 +110,8 @@ class ExposureControl : public nodelet::Nodelet {
 
   void publishOpenCVImage(cv::InputArray detected_edges, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub);
   void publishImageNumber(uint64_t count);
+
+  void ShowExpImage(int scroll_value, cv::Mat &image);
 };
 
 
@@ -135,7 +135,6 @@ void ExposureControl::onInit() {
   param_loader.loadParam("gui", _gui_);
   param_loader.loadParam("rate/publish", _rate_timer_publish_);
   param_loader.loadParam("rate/check_subscribers", _rate_timer_check_subscribers_);
-  param_loader.loadParam("canny_threshold", low_threshold_);
 
   if (!param_loader.loadedSuccessfully()) {
     ROS_ERROR("[WaypointFlier]: failed to load non-optional parameters!");
@@ -160,9 +159,6 @@ void ExposureControl::onInit() {
   /* initialize the image transport, needs node handle */
   image_transport::ImageTransport it(nh);
 
-  // | -------------- initialize tranform listener -------------- |
-  // the transform listener will fill the TF buffer with latest transforms
-  tf_listener_ptr_ = std::make_unique<tf2_ros::TransformListener>(tf_buffer_);
 
   // | ----------------- initialize subscribers ----------------- |
   sub_image_       = it.subscribe("image_in", 1, &ExposureControl::callbackImage, this);
@@ -188,7 +184,6 @@ void ExposureControl::onInit() {
 }
 
 
-
 void ExposureControl::callbackCameraInfo(const sensor_msgs::CameraInfoConstPtr& msg) {
 
   if (!is_initialized_) {
@@ -202,7 +197,12 @@ void ExposureControl::callbackCameraInfo(const sensor_msgs::CameraInfoConstPtr& 
   camera_model_.fromCameraInfo(*msg);
 }
 
+void ExposureControl::ShowExpImage(int scroll_value, cv::Mat &image){
 
+  image  = image * (static_cast<double>(scroll_value) / 1000.0);
+  /* show the image in gui (!the image will be displayed after calling cv::waitKey()!) */
+  cv::imshow("camera's view", image);
+}
 
 void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
 
@@ -236,11 +236,12 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
   }
   
   cv::Mat dImg = cv_ptr->image;
+  
+  cv::createTrackbar ("Change exposure", "camera's view", &exposure_slider_value,max_exposure);
 
-  dImg = dImg * (shutter_speed / 1000.0);
-  /* show the image in gui (!the image will be displayed after calling cv::waitKey()!) */
+
   if (_gui_) {
-    cv::imshow("camera's view", dImg);
+    ExposureControl::ShowExpImage(exposure_slider_value, std::ref(dImg));
   }
 
   /* output a text about it */
@@ -357,7 +358,7 @@ bool ExposureControl::callbackIncreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
     ROS_WARN("[ExposureControl]: Cannot increase shutter speed, nodelet is not initialized.");
     return true;
   }
-
+  shutter_speed += 100.0;
   ROS_INFO("[ExposureControl]: shutter speed increased!");
 
   res.success = true;

@@ -25,7 +25,7 @@
 								"border": "normal",
 								"floating": "auto_off",
 								"layout": "splitv",
-								"percent": 0.333333333333333,
+								"percent": 0.33333333,
 								"type": "con",
 								"nodes": [
 									{
@@ -39,7 +39,7 @@
 											"y": 0
 										},
 										"name": "runVim session.yml",
-										"percent": 0.5,
+										"percent": 0.33333333,
 										"swallows": [
 											{
 												"instance": "^urxvt$"
@@ -52,13 +52,13 @@
 										"current_border_width": 3,
 										"floating": "auto_off",
 										"geometry": {
-											"height": 1060,
-											"width": 1920,
+											"height": 460,
+											"width": 724,
 											"x": 0,
 											"y": 0
 										},
 										"name": "Gazebo",
-										"percent": 0.5,
+										"percent": 0.33333333,
 										"swallows": [
 											{
 												"instance": "^gazebo$"
@@ -72,7 +72,7 @@
 								"border": "normal",
 								"floating": "auto_off",
 								"layout": "splitv",
-								"percent": 0.333333333333333,
+								"percent": 0.33333333,
 								"type": "con",
 								"nodes": [
 									{
@@ -86,7 +86,7 @@
 											"y": 0
 										},
 										"name": "uav1.rviz* - RViz",
-										"percent": 0.5,
+										"percent": 0.33333333,
 										"swallows": [
 											{
 												"instance": "^rviz$"
@@ -105,7 +105,7 @@
 											"y": 0
 										},
 										"name": "rqt_reconfigure__Param - rqt",
-										"percent": 0.5,
+										"percent": 0.33333333,
 										"swallows": [
 											{
 												"instance": "^rqt_reconfigure$"
@@ -119,67 +119,8 @@
 								"border": "normal",
 								"floating": "auto_off",
 								"layout": "splitv",
-								"percent": 0.333333333333333,
-								"type": "con",
-								"nodes": [
-									{
-										"border": "pixel",
-										"current_border_width": 3,
-										"floating": "auto_off",
-										"geometry": {
-											"height": 460,
-											"width": 724,
-											"x": 0,
-											"y": 0
-										},
-										"name": "edges",
-										"percent": 0.333333333333333,
-										"swallows": [
-											{
-												"instance": "^original$"
-											}
-										],
-										"type": "con"
-									},
-									{
-										"border": "pixel",
-										"current_border_width": 3,
-										"floating": "auto_off",
-										"geometry": {
-											"height": 460,
-											"width": 724,
-											"x": 0,
-											"y": 0
-										},
-										"name": "world_point",
-										"percent": 0.333333333333333,
-										"swallows": [
-											{
-												"instance": "^original$"
-											}
-										],
-										"type": "con"
-									},
-									{
-										"border": "pixel",
-										"current_border_width": 3,
-										"floating": "auto_off",
-										"geometry": {
-											"height": 460,
-											"width": 724,
-											"x": 0,
-											"y": 0
-										},
-										"name": "original",
-										"percent": 0.333333333333333,
-										"swallows": [
-											{
-												"instance": "^original$"
-											}
-										],
-										"type": "con"
-									}
-								]
+								"percent": 0.5,
+								"type": "con"
 							}
 						]
 					}
