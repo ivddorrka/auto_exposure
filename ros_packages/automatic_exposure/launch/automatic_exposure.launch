@@ -21,6 +21,11 @@
   <arg     if="$(arg standalone)" name="nodelet_manager" value=""/>
   <arg unless="$(arg standalone)" name="nodelet_manager" value="$(arg manager)"/>
 
+  <include file="$(find apriltag_ros)/launch/continuous_detection.launch"/>
+
+  <node pkg="topic_tools" type="relay" args="mobius_camera/image_raw /camera_rect/image_rect" name="raw2rect" output="log"/>
+  <node pkg="topic_tools" type="relay" args="mobius_camera/camera_info /camera_rect/camera_info" name="in2in" output="log"/>
+  
   <group ns="$(arg UAV_NAME)">
 
     <node pkg="nodelet" type="nodelet" name="automatic_exposure" args="$(arg nodelet) automatic_exposure/ExposureControl $(arg nodelet_manager)" launch-prefix="$(arg launch_prefix_debug)" output="screen">
