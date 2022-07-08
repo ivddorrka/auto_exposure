@@ -53,3 +53,7 @@ windows:
       panes:
         - waitForControl; roslaunch mrs_uav_testing rviz.launch
         - waitForControl; roslaunch mrs_rviz_plugins load_robot.launch
+  - tag_detection:
+      layout: even-vertical
+      panes:
+        - waitForControl; roslaunch apriltag_ros single_image_server.launch

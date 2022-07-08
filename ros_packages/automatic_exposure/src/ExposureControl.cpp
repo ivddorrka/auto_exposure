@@ -38,10 +38,13 @@
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/transformer.h>
 
-
-
 /* for calling simple ros services */
 #include <std_srvs/Trigger.h>
+
+/* SRV include for gain setup*/
+#include "automatic_exposure/SetNewGain.h"
+
+
 
 
 namespace automatic_exposure
@@ -90,9 +93,15 @@ class ExposureControl : public nodelet::Nodelet {
   // | --------------- variables for exposure -------------- |
 
   int max_exposure = 10000;
-  int exposure_slider_value = 1000.0;
-  double shutter_speed = 1000.0;
+  int exposure_slider_value = 1000;
   const double  shutter_speed_default = 1000.0;
+  
+  double default_gain = 1.0;
+  double gain_to_set = default_gain;
+
+  cv::Mat image_matrix;
+  bool flag_save = 0;
+
   // | ----------------------- publishers ----------------------- |
 
   ros::Publisher             pub_test_;
@@ -106,10 +115,15 @@ class ExposureControl : public nodelet::Nodelet {
   bool               callbackIncreaseShutterSpeed(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   ros::ServiceServer srv_server_increase_shutter_speed_;
 
+
+  bool               callbackSetNewGain(automatic_exposure::SetNewGain::Request &req,  automatic_exposure::SetNewGain::Response &res);
+  ros::ServiceServer srv_server_set_new_gain_;
+
   void publishOpenCVImage(cv::InputArray detected_edges, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub);
   void publishImageNumber(uint64_t count);
 
-  void ShowExpImage(int scroll_value, cv::Mat &image);
+  void ShowExpImage(cv::Mat &image);
+  double gain_calculation(cv::Mat &dImg);
 };
 
 
@@ -120,7 +134,7 @@ void ExposureControl::onInit() {
 
   /* obtain node handle */
   ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
-
+  ros::NodeHandle n;
   /* waits for the ROS to publish clock */
   ros::Time::waitForValid();
 
@@ -135,7 +149,7 @@ void ExposureControl::onInit() {
   param_loader.loadParam("rate/check_subscribers", _rate_timer_check_subscribers_);
 
   if (!param_loader.loadedSuccessfully()) {
-    ROS_ERROR("[WaypointFlier]: failed to load non-optional parameters!");
+    ROS_ERROR("[ExposureControl]: failed to load non-optional parameters!");
     ros::shutdown();
   }
 
@@ -149,9 +163,9 @@ void ExposureControl::onInit() {
 
   if (_gui_) {
 
-    int flags = cv::WINDOW_NORMAL;
-    cv::namedWindow("camera's view", flags);
-
+    int flags = cv::WINDOW_NORMAL | cv::WINDOW_NORMAL;
+    cv::namedWindow("exposure_depend", flags);
+    cv::namedWindow("gain_depend", flags);
   }
 
   /* initialize the image transport, needs node handle */
@@ -173,6 +187,8 @@ void ExposureControl::onInit() {
 
 
    srv_server_decrease_shutter_speed_ = nh.advertiseService("srv_server_decrease_shutter_speed_", &ExposureControl::callbackDecreaseShutterSpeed, this);
+   
+   srv_server_set_new_gain_ = n.advertiseService("srv_server_set_new_gain_", &ExposureControl::callbackSetNewGain, this);
 
   ROS_INFO_ONCE("initialized==true");
 
@@ -195,11 +211,11 @@ void ExposureControl::callbackCameraInfo(const sensor_msgs::CameraInfoConstPtr& 
   camera_model_.fromCameraInfo(*msg);
 }
 
-void ExposureControl::ShowExpImage(int scroll_value, cv::Mat &image){
+void ExposureControl::ShowExpImage(cv::Mat &image){
 
-  image  = image * (static_cast<double>(scroll_value) / 1000.0);
+  image  = image * (static_cast<double>(exposure_slider_value) / 1000.0);
   /* show the image in gui (!the image will be displayed after calling cv::waitKey()!) */
-  cv::imshow("camera's view", image);
+  cv::imshow("exposure_depend", image);
 }
 
 void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
@@ -234,12 +250,28 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
   }
   
   cv::Mat dImg = cv_ptr->image;
-  
-  cv::createTrackbar ("Change exposure", "camera's view", &exposure_slider_value,max_exposure);
+  std::mutex m1;
 
+  m1.lock();
+
+  if (flag_save == 0) {
+    flag_save = 1;
+    default_gain = gain_calculation(std::ref(dImg));
+    gain_to_set = default_gain;
+  }
+  m1.unlock();
+  cv::createTrackbar ("Change exposure", "exposure_depend", &exposure_slider_value,max_exposure);
+
+  
+  if (_gui_) {
+    ExposureControl::ShowExpImage(std::ref(dImg));
+  }
+  
+  cv::Mat image = cv_ptr->image;
+  image  = image * (gain_to_set / default_gain);
 
   if (_gui_) {
-    ExposureControl::ShowExpImage(exposure_slider_value, std::ref(dImg));
+    cv::imshow("gain_depend", dImg); 
   }
 
   /* output a text about it */
@@ -310,9 +342,40 @@ void ExposureControl::publishOpenCVImage(cv::InputArray image, const std_msgs::H
   pub.publish(out_msg);
 }
 
+double ExposureControl::gain_calculation(cv::Mat &dImg){
+  
+  cv::Scalar meann, stdv;
+  cv::meanStdDev(dImg, meann, stdv, cv::Mat());
+
+  float mean_Mat = meann.val[0];
+  float stan_dev = stdv.val[0];
+  
+  float result_standard = (stan_dev * stan_dev);
+
+  float gain = mean_Mat / result_standard;
+  return static_cast<double>(gain);
+
+}
+
+bool ExposureControl::callbackSetNewGain(automatic_exposure::SetNewGain::Request &req,  automatic_exposure::SetNewGain::Response &res){
 
 
+  if (!is_initialized_) {
+    ROS_WARN("[ExposureControl]: Cannot set new gain!");
+    return true;
+  }
+  res.A = req.A; 
+  gain_to_set  = static_cast<double>(req.A);
+  ROS_INFO("[ExposureControl]:  new gain was set!");
 
+ /* res.success = true;
+  res.message = "All fine";
+  */
+
+  return true;
+
+}
+ 
 bool ExposureControl::callbackDecreaseShutterSpeed([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {
 
   if (!is_initialized_) {
@@ -323,16 +386,27 @@ bool ExposureControl::callbackDecreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
     return true;
   }
   
-  if (shutter_speed > 0.1){
-     shutter_speed -= 100.0;
+  if (exposure_slider_value > 100){
+     exposure_slider_value -= 100;
 
      ROS_INFO("[ExposureControl]: shutter speed decreased!");
 
      res.success = true;
-     res.message = "Shutter speed decreased by 100 mcr-seconds";
+     std::string decreased_speed = std::to_string(exposure_slider_value);
+     res.message = "Shutter speed is = " + decreased_speed;
+
+  } else if (exposure_slider_value == 100){
+
+    exposure_slider_value = 0;
+
+     ROS_INFO("[ExposureControl]: shutter speed is at it's lowest value!");
+
+     res.success = true;
+     res.message = "Shutter speed is = 0";
 
 
-  } else {
+  }
+  else {
      ROS_INFO("[ExposureControl]: shutter speed cannot be decreased any more!");
 
      res.success = true;
@@ -356,11 +430,11 @@ bool ExposureControl::callbackIncreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
     ROS_WARN("[ExposureControl]: Cannot increase shutter speed, nodelet is not initialized.");
     return true;
   }
-  shutter_speed += 100.0;
-  ROS_INFO("[ExposureControl]: shutter speed increased!");
-
+  exposure_slider_value += 100;
+  ROS_INFO("Shutter speed increased by 100.0");
   res.success = true;
-  res.message = "Shutter speed increased by 100 mcr-seconds";
+  std::string increased_speed = std::to_string(exposure_slider_value);
+  res.message = "Shutter speed is = " + increased_speed;
 
   return true;
 }
