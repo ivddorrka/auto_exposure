@@ -99,8 +99,7 @@ class ExposureControl : public nodelet::Nodelet {
   double default_gain = 1.0;
   double gain_to_set = default_gain;
 
-  cv::Mat image_matrix;
-  bool flag_save = 0;
+  bool flag_save = 1;
 
   // | ----------------------- publishers ----------------------- |
 
@@ -255,9 +254,9 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
   m1.lock();
 
   if (flag_save == 0) {
-    flag_save = 1;
+    flag_save = 2;
     default_gain = gain_calculation(std::ref(dImg));
-    gain_to_set = default_gain;
+    //gain_to_set = default_gain;
   }
   m1.unlock();
   cv::createTrackbar ("Change exposure", "exposure_depend", &exposure_slider_value,max_exposure);
@@ -271,7 +270,7 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
   image  = image * (gain_to_set / default_gain);
 
   if (_gui_) {
-    cv::imshow("gain_depend", dImg); 
+    cv::imshow("gain_depend", image); 
   }
 
   /* output a text about it */
@@ -350,9 +349,9 @@ double ExposureControl::gain_calculation(cv::Mat &dImg){
   float mean_Mat = meann.val[0];
   float stan_dev = stdv.val[0];
   
-  float result_standard = (stan_dev * stan_dev);
+  float variation = (stan_dev * stan_dev);
 
-  float gain = mean_Mat / result_standard;
+  float gain = mean_Mat / variation;
   return static_cast<double>(gain);
 
 }
@@ -364,8 +363,13 @@ bool ExposureControl::callbackSetNewGain(automatic_exposure::SetNewGain::Request
     ROS_WARN("[ExposureControl]: Cannot set new gain!");
     return true;
   }
-  res.A = req.A; 
-  gain_to_set  = static_cast<double>(req.A);
+  mutex_counters_.lock();
+  if (flag_save==1){
+    flag_save = 0;
+  }
+  mutex_counters_.unlock();
+  res.new_gain = req.new_gain; 
+  gain_to_set  = static_cast<double>(req.new_gain);
   ROS_INFO("[ExposureControl]:  new gain was set!");
 
  /* res.success = true;

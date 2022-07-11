@@ -1,1 +1,1 @@
-float64 A
+float64 new_gain
