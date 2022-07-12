@@ -105,7 +105,8 @@ class ExposureControl : public nodelet::Nodelet {
 
   ros::Publisher             pub_test_;
   int                        _rate_timer_publish_;
-
+  image_transport::Publisher gain_published;
+  image_transport::Publisher exposure_published;
   // | --------------------- other functions -------------------- |
   bool               callbackDecreaseShutterSpeed(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   ros::ServiceServer srv_server_decrease_shutter_speed_;
@@ -118,7 +119,8 @@ class ExposureControl : public nodelet::Nodelet {
   bool               callbackSetNewGain(automatic_exposure::SetNewGain::Request &req,  automatic_exposure::SetNewGain::Response &res);
   ros::ServiceServer srv_server_set_new_gain_;
 
-  void publishOpenCVImage(cv::InputArray detected_edges, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub);
+  void publishOpenCVImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub);
+  
   void publishImageNumber(uint64_t count);
 
   void ShowExpImage(cv::Mat &image);
@@ -177,7 +179,8 @@ void ExposureControl::onInit() {
 
   // | ------------------ initialize publishers ----------------- |
   pub_test_       = nh.advertise<std_msgs::UInt64>("test_publisher", 1);
-
+  exposure_published = it.advertise("exposure_published", 1); 
+  gain_published = it.advertise("gain_published", 1); 
   // | -------------------- initialize timers ------------------- |
   timer_check_subscribers_ = nh.createTimer(ros::Rate(_rate_timer_check_subscribers_), &ExposureControl::callbackTimerCheckSubscribers, this);
 
@@ -234,8 +237,8 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
     time_last_image_ = ros::Time::now();
   }
 
-  //const cv_bridge::CvImageConstPtr bridge_image_ptr = cv_bridge::toCvShare(msg, color_encoding);
- // const std_msgs::Header           msg_header       = msg->header;
+  const cv_bridge::CvImageConstPtr bridge_image_ptr = cv_bridge::toCvShare(msg, color_encoding);
+  const std_msgs::Header           msg_header       = msg->header;
   cv_bridge::CvImagePtr cv_ptr;
   try
   {
@@ -249,6 +252,7 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
   }
   
   cv::Mat dImg = cv_ptr->image;
+  cv::Mat image = dImg;
   std::mutex m1;
 
   m1.lock();
@@ -266,7 +270,6 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
     ExposureControl::ShowExpImage(std::ref(dImg));
   }
   
-  cv::Mat image = cv_ptr->image;
   image  = image * (gain_to_set / default_gain);
 
   if (_gui_) {
@@ -275,8 +278,8 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
 
   /* output a text about it */
   ROS_INFO_THROTTLE(1, "[ExposureContrl]: Total of %u images received so far", (unsigned int)image_counter_);
-
-
+  ExposureControl::publishOpenCVImage(std::ref(image), msg_header, color_encoding, gain_published); 
+  ExposureControl::publishOpenCVImage(std::ref(dImg), msg_header, color_encoding, exposure_published); 
   /* publish image count */
   ExposureControl::publishImageNumber(image_counter_);
 
@@ -320,7 +323,7 @@ void ExposureControl::publishImageNumber(uint64_t count) {
 }
 
 
-void ExposureControl::publishOpenCVImage(cv::InputArray image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub) {
+void ExposureControl::publishOpenCVImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub) {
 
   // Prepare a cv_bridge image to be converted to the ROS message
   cv_bridge::CvImage bridge_image_out;
@@ -329,7 +332,7 @@ void ExposureControl::publishOpenCVImage(cv::InputArray image, const std_msgs::H
   bridge_image_out.header = header;
 
   // Copy the cv::Mat, pointing to the image
-  bridge_image_out.image = image.getMat();
+  bridge_image_out.image = image;
 
   // Fill out the message encoding - this tells ROS how to interpret the raw image data
   // (see https://wiki.ros.org/cv_bridge/Tutorials/UsingCvBridgeToConvertBetweenROSImagesAndOpenCVImages)
@@ -351,7 +354,7 @@ double ExposureControl::gain_calculation(cv::Mat &dImg){
   
   float variation = (stan_dev * stan_dev);
 
-  float gain = mean_Mat / variation;
+  float gain = variation / mean_Mat;
   return static_cast<double>(gain);
 
 }
