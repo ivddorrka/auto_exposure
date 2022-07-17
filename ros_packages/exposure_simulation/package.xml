@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>automatic_exposure</name>
+  <name>exposure_simulation</name>
   <version>1.0.0</version>
-  <description>The automatic_exposure package</description>
+  <description>The exposure_simulation package</description>
 
   <maintainer email="ivddorrka@gmail.com">ivddorrka</maintainer>
   <license>MIT</license>

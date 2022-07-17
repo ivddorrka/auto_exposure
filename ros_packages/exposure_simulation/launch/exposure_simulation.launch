@@ -23,12 +23,12 @@
 
   <include file="$(find apriltag_ros)/launch/continuous_detection.launch"/>
 
-  <node pkg="topic_tools" type="relay" args="mobius_camera/image_raw /camera_rect/image_rect" name="raw2rect" output="log"/>
-  <node pkg="topic_tools" type="relay" args="mobius_camera/camera_info /camera_rect/camera_info" name="in2in" output="log"/>
-  
+  <node pkg="topic_tools" type="relay" args="mobius_down/image_raw /camera_rect/image_rect" name="raw2rect" output="log"/>
+  <node pkg="topic_tools" type="relay" args="mobius_down/camera_info /camera_rect/camera_info" name="in2in" output="log"/>
+  <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/tag_detections_image"/>
   <group ns="$(arg UAV_NAME)">
 
-    <node pkg="nodelet" type="nodelet" name="automatic_exposure" args="$(arg nodelet) automatic_exposure/ExposureControl $(arg nodelet_manager)" launch-prefix="$(arg launch_prefix_debug)" output="screen">
+    <node pkg="nodelet" type="nodelet" name="exposure_simulation" args="$(arg nodelet) exposure_simulation/ExposureControl $(arg nodelet_manager)" launch-prefix="$(arg launch_prefix_debug)" output="screen">
 
       <!-- Parameters loaded from launch file -->
       <param name="gui" type="bool" value="$(arg gui)"/>
@@ -36,8 +36,8 @@
       <param name="UAV_NAME" type="string" value="$(arg UAV_NAME)"/>
 
       <!-- ROS parameters config file -->
-      <rosparam file="$(find automatic_exposure)/config/default.yaml" />
-      <rosparam file="$(find automatic_exposure)/config/$(arg RUN_TYPE).yaml" />
+      <rosparam file="$(find exposure_simulation)/config/default.yaml" />
+      <rosparam file="$(find exposure_simulation)/config/$(arg RUN_TYPE).yaml" />
 
       <!-- Subscribers (note that the topic names will also be remapped using the namespace as a prefix) -->
       <remap from="~image_in" to="mobius_down/image_raw" />

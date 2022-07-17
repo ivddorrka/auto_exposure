@@ -38,7 +38,7 @@ windows:
   - camera_window:
       layout: even-vertical
       panes:
-        - waitForControl; roslaunch automatic_exposure automatic_exposure.launch
+        - waitForControl; roslaunch exposure_simulation exposure_simulation.launch
   - dynamic_reconfigure:
       layout: even-vertical
       panes:
@@ -56,4 +56,4 @@ windows:
   - tag_detection:
       layout: even-vertical
       panes:
-        - waitForControl; roslaunch apriltag_ros single_image_server.launch
+        - waitForControl; roslaunch apriltag_ros continuous_detection.launch

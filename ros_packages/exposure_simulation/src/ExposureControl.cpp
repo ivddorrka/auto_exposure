@@ -1,5 +1,3 @@
-
-
 /* each ROS nodelet must have these */
 #include <ros/ros.h>
 #include <ros/package.h>
@@ -42,12 +40,12 @@
 #include <std_srvs/Trigger.h>
 
 /* SRV include for gain setup*/
-#include "automatic_exposure/SetNewGain.h"
+#include "exposure_simulation/SetNewGain.h"
 
 
 
 
-namespace automatic_exposure
+namespace exposure_simulation
 {
 
 class ExposureControl : public nodelet::Nodelet {
@@ -107,6 +105,7 @@ class ExposureControl : public nodelet::Nodelet {
   int                        _rate_timer_publish_;
   image_transport::Publisher gain_published;
   image_transport::Publisher exposure_published;
+  image_transport::Publisher tag_detect; 
   // | --------------------- other functions -------------------- |
   bool               callbackDecreaseShutterSpeed(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   ros::ServiceServer srv_server_decrease_shutter_speed_;
@@ -116,7 +115,7 @@ class ExposureControl : public nodelet::Nodelet {
   ros::ServiceServer srv_server_increase_shutter_speed_;
 
 
-  bool               callbackSetNewGain(automatic_exposure::SetNewGain::Request &req,  automatic_exposure::SetNewGain::Response &res);
+  bool               callbackSetNewGain(exposure_simulation::SetNewGain::Request &req,  exposure_simulation::SetNewGain::Response &res);
   ros::ServiceServer srv_server_set_new_gain_;
 
   void publishOpenCVImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub);
@@ -167,6 +166,8 @@ void ExposureControl::onInit() {
     int flags = cv::WINDOW_NORMAL | cv::WINDOW_NORMAL;
     cv::namedWindow("exposure_depend", flags);
     cv::namedWindow("gain_depend", flags);
+    cv::namedWindow("tag_detect", flags);
+
   }
 
   /* initialize the image transport, needs node handle */
@@ -180,7 +181,8 @@ void ExposureControl::onInit() {
   // | ------------------ initialize publishers ----------------- |
   pub_test_       = nh.advertise<std_msgs::UInt64>("test_publisher", 1);
   exposure_published = it.advertise("exposure_published", 1); 
-  gain_published = it.advertise("gain_published", 1); 
+  gain_published = it.advertise("gain_published", 1);
+  tag_detect = it.advertise("tag_detect", 1);
   // | -------------------- initialize timers ------------------- |
   timer_check_subscribers_ = nh.createTimer(ros::Rate(_rate_timer_check_subscribers_), &ExposureControl::callbackTimerCheckSubscribers, this);
 
@@ -190,7 +192,7 @@ void ExposureControl::onInit() {
 
    srv_server_decrease_shutter_speed_ = nh.advertiseService("srv_server_decrease_shutter_speed_", &ExposureControl::callbackDecreaseShutterSpeed, this);
    
-   srv_server_set_new_gain_ = n.advertiseService("srv_server_set_new_gain_", &ExposureControl::callbackSetNewGain, this);
+   srv_server_set_new_gain_ = nh.advertiseService("srv_server_set_new_gain_", &ExposureControl::callbackSetNewGain, this);
 
   ROS_INFO_ONCE("initialized==true");
 
@@ -276,10 +278,15 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
     cv::imshow("gain_depend", image); 
   }
 
+  if (_gui_) {
+    cv::imshow("tag_detect", image);
+  }
+
   /* output a text about it */
   ROS_INFO_THROTTLE(1, "[ExposureContrl]: Total of %u images received so far", (unsigned int)image_counter_);
   ExposureControl::publishOpenCVImage(std::ref(image), msg_header, color_encoding, gain_published); 
   ExposureControl::publishOpenCVImage(std::ref(dImg), msg_header, color_encoding, exposure_published); 
+  ExposureControl::publishOpenCVImage(std::ref(dImg), msg_header, color_encoding, tag_detect);
   /* publish image count */
   ExposureControl::publishImageNumber(image_counter_);
 
@@ -359,7 +366,7 @@ double ExposureControl::gain_calculation(cv::Mat &dImg){
 
 }
 
-bool ExposureControl::callbackSetNewGain(automatic_exposure::SetNewGain::Request &req,  automatic_exposure::SetNewGain::Response &res){
+bool ExposureControl::callbackSetNewGain(exposure_simulation::SetNewGain::Request &req,  exposure_simulation::SetNewGain::Response &res){
 
 
   if (!is_initialized_) {
@@ -392,35 +399,11 @@ bool ExposureControl::callbackDecreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
     ROS_WARN("[ExposureControl]: Cannot decrease shutter speed, nodelet is not initialized.");
     return true;
   }
-  
-  if (exposure_slider_value > 100){
-     exposure_slider_value -= 100;
-
-     ROS_INFO("[ExposureControl]: shutter speed decreased!");
-
-     res.success = true;
-     std::string decreased_speed = std::to_string(exposure_slider_value);
-     res.message = "Shutter speed is = " + decreased_speed;
-
-  } else if (exposure_slider_value == 100){
-
-    exposure_slider_value = 0;
-
-     ROS_INFO("[ExposureControl]: shutter speed is at it's lowest value!");
-
-     res.success = true;
-     res.message = "Shutter speed is = 0";
-
-
-  }
-  else {
-     ROS_INFO("[ExposureControl]: shutter speed cannot be decreased any more!");
-
-     res.success = true;
-     res.message = "Shutter speed is already 0!";
-
-  }
-
+  exposure_slider_value += 100;
+  ROS_INFO("Shutter speed decreased by 100.0");
+  res.success = true;
+  std::string decreased_speed = std::to_string(exposure_slider_value);
+  res.message = "Shutter speed is = " + decreased_speed;
 
   return true;
 }
@@ -437,7 +420,34 @@ bool ExposureControl::callbackIncreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
     ROS_WARN("[ExposureControl]: Cannot increase shutter speed, nodelet is not initialized.");
     return true;
   }
-  exposure_slider_value += 100;
+
+  if (exposure_slider_value > 100){
+     exposure_slider_value -= 100;
+
+     ROS_INFO("[ExposureControl]: shutter speed increased!");
+
+     res.success = true;
+     std::string increased_speed = std::to_string(exposure_slider_value);
+     res.message = "Shutter speed is = " + increased_speed;
+
+  } else if (exposure_slider_value == 100){
+
+    exposure_slider_value = 0;
+
+     ROS_INFO("[ExposureControl]: shutter speed is at it's highest value!");
+
+     res.success = true;
+     res.message = "Shutter speed is max";
+
+
+  }
+  else {
+     ROS_INFO("[ExposureControl]: shutter speed cannot be increased any more!");
+
+     res.success = true;
+     res.message = "Shutter speed is already max!";
+
+  }
   ROS_INFO("Shutter speed increased by 100.0");
   res.success = true;
   std::string increased_speed = std::to_string(exposure_slider_value);
@@ -452,4 +462,4 @@ bool ExposureControl::callbackIncreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
 
 /* every nodelet must include macros which export the class as a nodelet plugin */
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(automatic_exposure::ExposureControl, nodelet::Nodelet);
+PLUGINLIB_EXPORT_CLASS(exposure_simulation::ExposureControl, nodelet::Nodelet);

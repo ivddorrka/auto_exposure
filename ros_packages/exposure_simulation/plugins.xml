@@ -1,0 +1,5 @@
+<library path="lib/libExposureControl">    
+  <class name="exposure_simulation/ExposureControl" type="exposure_simulation::ExposureControl" base_class_type="nodelet::Nodelet">
+    <description>ExposureControl nodelet</description>
+  </class>
+</library>
