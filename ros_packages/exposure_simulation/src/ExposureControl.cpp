@@ -42,8 +42,14 @@
 /* SRV include for gain setup*/
 #include "exposure_simulation/SetNewGain.h"
 
+/* for math calculations */
+#include <cmath>
 
-
+/*synchronization*/
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
 
 namespace exposure_simulation
 {
@@ -90,8 +96,8 @@ class ExposureControl : public nodelet::Nodelet {
 
   // | --------------- variables for exposure -------------- |
 
-  int max_exposure = 10000;
-  int exposure_slider_value = 1000;
+  int max_exposure = 100000;
+  int exposure_slider_value = 10000;
   const double  shutter_speed_default = 1000.0;
   
   double default_gain = 1.0;
@@ -105,7 +111,9 @@ class ExposureControl : public nodelet::Nodelet {
   int                        _rate_timer_publish_;
   image_transport::Publisher gain_published;
   image_transport::Publisher exposure_published;
-  image_transport::Publisher tag_detect; 
+  image_transport::Publisher tag_detect;
+
+  sensor_msgs::CameraInfoConstPtr msg_camera_info;
   // | --------------------- other functions -------------------- |
   bool               callbackDecreaseShutterSpeed(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res);
   ros::ServiceServer srv_server_decrease_shutter_speed_;
@@ -119,7 +127,7 @@ class ExposureControl : public nodelet::Nodelet {
   ros::ServiceServer srv_server_set_new_gain_;
 
   void publishOpenCVImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub);
-  
+ 
   void publishImageNumber(uint64_t count);
 
   void ShowExpImage(cv::Mat &image);
@@ -194,7 +202,8 @@ void ExposureControl::onInit() {
    
    srv_server_set_new_gain_ = nh.advertiseService("srv_server_set_new_gain_", &ExposureControl::callbackSetNewGain, this);
 
-  ROS_INFO_ONCE("initialized==true");
+  
+   ROS_INFO_ONCE("initialized==true");
 
   is_initialized_ = true;
 
@@ -216,8 +225,8 @@ void ExposureControl::callbackCameraInfo(const sensor_msgs::CameraInfoConstPtr& 
 }
 
 void ExposureControl::ShowExpImage(cv::Mat &image){
-
-  image  = image * (static_cast<double>(exposure_slider_value) / 1000.0);
+  
+  image  = image * (sqrt(static_cast<double>(exposure_slider_value)) / 100.0);
   /* show the image in gui (!the image will be displayed after calling cv::waitKey()!) */
   cv::imshow("exposure_depend", image);
 }
@@ -272,7 +281,7 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
     ExposureControl::ShowExpImage(std::ref(dImg));
   }
   
-  image  = image * (gain_to_set / default_gain);
+  image  = image * pow((gain_to_set / default_gain), 0.5);
 
   if (_gui_) {
     cv::imshow("gain_depend", image); 
@@ -287,6 +296,7 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
   ExposureControl::publishOpenCVImage(std::ref(image), msg_header, color_encoding, gain_published); 
   ExposureControl::publishOpenCVImage(std::ref(dImg), msg_header, color_encoding, exposure_published); 
   ExposureControl::publishOpenCVImage(std::ref(dImg), msg_header, color_encoding, tag_detect);
+
   /* publish image count */
   ExposureControl::publishImageNumber(image_counter_);
 
@@ -362,7 +372,9 @@ double ExposureControl::gain_calculation(cv::Mat &dImg){
   float variation = (stan_dev * stan_dev);
 
   float gain = variation / mean_Mat;
-  return static_cast<double>(gain);
+  float gain_logarithmic_power = gain / 10.0;
+  float gain_logarithmic = pow(10.0, gain_logarithmic_power);
+  return static_cast<double>(gain_logarithmic);
 
 }
 
@@ -379,12 +391,11 @@ bool ExposureControl::callbackSetNewGain(exposure_simulation::SetNewGain::Reques
   }
   mutex_counters_.unlock();
   res.new_gain = req.new_gain; 
-  gain_to_set  = static_cast<double>(req.new_gain);
-  ROS_INFO("[ExposureControl]:  new gain was set!");
-
- /* res.success = true;
-  res.message = "All fine";
-  */
+  double power_log = static_cast<double>(req.new_gain) / 10.0;
+  
+  gain_to_set  = pow(10.0, power_log);
+  std::string ros_message = "[ExposureControl] new gain  = " + std::to_string(gain_to_set);
+  res.message =  ros_message;
 
   return true;
 
@@ -407,8 +418,6 @@ bool ExposureControl::callbackDecreaseShutterSpeed([[maybe_unused]] std_srvs::Tr
 
   return true;
 }
-
-
 
 
 bool ExposureControl::callbackIncreaseShutterSpeed([[maybe_unused]] std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res) {

@@ -42,7 +42,8 @@
       <!-- Subscribers (note that the topic names will also be remapped using the namespace as a prefix) -->
       <remap from="~image_in" to="mobius_down/image_raw" />
       <remap from="~camera_info_in" to="mobius_down/camera_info" />
-
+      <remap from="~gain_in" to ="exposure_simulation/gain_published" />
+      <remap from="~tag_in" to ="exposure_simulation/tag_detect" />
       <!-- Publishers (note that the topic names will also be remapped using the namespace as a prefix) -->
       <remap from="~test_publisher" to="~image_number" />
 
