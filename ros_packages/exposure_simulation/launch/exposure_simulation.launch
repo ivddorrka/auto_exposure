@@ -23,8 +23,8 @@
 
   <include file="$(find apriltag_ros)/launch/continuous_detection.launch"/>
 
-  <node pkg="topic_tools" type="relay" args="mobius_down/image_raw /camera_rect/image_rect" name="raw2rect" output="log"/>
-  <node pkg="topic_tools" type="relay" args="mobius_down/camera_info /camera_rect/camera_info" name="in2in" output="log"/>
+  <node pkg="topic_tools" type="relay" args="/uav1/mobius_down/image_raw /camera_rect/image_rect" name="raw2rect" output="log"/>
+  <node pkg="topic_tools" type="relay" args="/uav1/exposure_simulation/camera_info /camera_rect/camera_info" name="in2in" output="log"/>
   <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/tag_detections_image"/>
   <group ns="$(arg UAV_NAME)">
 
@@ -40,10 +40,10 @@
       <rosparam file="$(find exposure_simulation)/config/$(arg RUN_TYPE).yaml" />
 
       <!-- Subscribers (note that the topic names will also be remapped using the namespace as a prefix) -->
-      <remap from="~image_in" to="mobius_down/image_raw" />
+      <remap from="~image_raw" to="mobius_down/image_raw" />
       <remap from="~camera_info_in" to="mobius_down/camera_info" />
-      <remap from="~gain_in" to ="exposure_simulation/gain_published" />
-      <remap from="~tag_in" to ="exposure_simulation/tag_detect" />
+      <remap from="~gain_image" to ="exposure_simulation/gain_published" />
+      <remap from="~tag_image" to ="/tag_detections_image" />
       <!-- Publishers (note that the topic names will also be remapped using the namespace as a prefix) -->
       <remap from="~test_publisher" to="~image_number" />
 
