@@ -14,6 +14,10 @@ class TagDetectorExposureSimulation():
         self.msg = None
         self.client = dynamic_reconfigure.client.Client("/camera/rgb_camera", timeout=30, config_callback=self.callback)
         self.client.update_configuration({"exposure":exposure})
+        if exposure == 0:
+            rospy.sleep(1)
+        else:
+            rospy.sleep(0.05)
         self.subscriber = rospy.Subscriber("/tag_detections", AprilTagDetectionArray, self.get_tag)
         
     def callback(self, config):
@@ -39,14 +43,14 @@ if __name__ == "__main__":
     r = rospy.Rate(1000)
     i_min = 0
     i_max = 10000
-    rospy.set_param("detected_flag", 0)
+    
     rospy.set_param("smallest_exposure", -1)
     rospy.set_param("largest_exposure", -1)
     pub = rospy.Publisher('results_top', String, queue_size=10)
-    change_exposure_by = 100
+    change_exposure_by = 400
     
     while not rospy.is_shutdown():
-        
+        rospy.set_param("detected_flag", 0)     
         cl = TagDetectorExposureSimulation(i)
 
         detected_flag = rospy.get_param("detected_flag")
@@ -64,13 +68,14 @@ if __name__ == "__main__":
             elif smallest_expo==-1 and largest_expo==-1:
                 i +=1
             
-            elif largest_expo!=-1 and smallest_expo!=-1:
-                pub.publish(f"min exposure = {i_min}, max exposure = {i_max}, i_min = {i_min}, i_max = {i_max}")
-                rospy.loginfo("Found min and max")
-                rospy.signal_shutdown("The end")
+            #elif largest_expo!=-1 and smallest_expo!=-1:
+                #pub.publish(f"min exposure = {i_min}, max exposure = {i_max}, i_min = {i_min}, i_max = {i_max}")
+                #rospy.loginfo("Found min and max")
+                #rospy.signal_shutdown("The end")
 
             
         else:
+
             if i == 10000:
                 i_max = i
                 pub.publish(f"min exposure = {i_min}, max exposure = {i_max}, i_min = {i_min}, i_max = {i_max}")
