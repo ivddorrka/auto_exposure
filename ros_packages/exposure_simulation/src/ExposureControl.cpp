@@ -132,7 +132,7 @@ class ExposureControl : public nodelet::Nodelet {
   ros::ServiceServer srv_server_set_new_gain_;
 
   
-  void publishTagImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub, const ros::Publisher pub_info, image_geometry::PinholeCameraModel camera_model_); 
+  void publishGainImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub, const ros::Publisher pub_info, image_geometry::PinholeCameraModel camera_model_); 
   void publishOpenCVImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub);
  
   void publishImageNumber(uint64_t count);
@@ -180,7 +180,6 @@ void ExposureControl::onInit() {
 
     int flags = cv::WINDOW_NORMAL | cv::WINDOW_NORMAL;
     cv::namedWindow("exposure_depend", flags);
-    cv::namedWindow("gain_depend", flags);
     cv::namedWindow("tag_detect", flags);
 
   }
@@ -274,7 +273,7 @@ void ExposureControl::callbackTagImage(const sensor_msgs::ImageConstPtr& msg) {
     cv::imshow("tag_detect", dImg);
   }
 
-  ExposureControl::publishTagImage(std::ref(dImg), msg_header, color_encoding, tag_detect, pub_info_, camera_model_);
+  ExposureControl::publishOpenCVImage(std::ref(dImg), msg_header, color_encoding, tag_detect);
 
 }
 
@@ -337,19 +336,10 @@ void ExposureControl::callbackImage(const sensor_msgs::ImageConstPtr& msg) {
   
   image  = image * pow((gain_to_set / default_gain), 0.5);
 
-  if (_gui_) {
-    cv::imshow("gain_depend", image); 
-  }
-
-  if (_gui_) {
-    cv::imshow("tag_detect", image);
-  }
-
   /* output a text about it */
   ROS_INFO_THROTTLE(1, "[ExposureContrl]: Total of %u images received so far", (unsigned int)image_counter_);
-  ExposureControl::publishOpenCVImage(std::ref(image), msg_header, color_encoding, gain_published); 
+  ExposureControl::publishGainImage(std::ref(image), msg_header, color_encoding, gain_published, pub_info_, camera_model_); 
   ExposureControl::publishOpenCVImage(std::ref(dImg), msg_header, color_encoding, exposure_published); 
-  //ExposureControl::publishTagImage(std::ref(dImg), msg_header, color_encoding, tag_detect, pub_info_, camera_model_);
 
   /* publish image count */
   ExposureControl::publishImageNumber(image_counter_);
@@ -416,7 +406,7 @@ void ExposureControl::publishOpenCVImage(cv::Mat &image, const std_msgs::Header&
 }
 
 
-void ExposureControl::publishTagImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub, const ros::Publisher pub_info, image_geometry::PinholeCameraModel camera_model_) {
+void ExposureControl::publishGainImage(cv::Mat &image, const std_msgs::Header& header, const std::string& encoding, const image_transport::Publisher& pub, const ros::Publisher pub_info, image_geometry::PinholeCameraModel camera_model_) {
 
   // Prepare a cv_bridge image to be converted to the ROS message
   cv_bridge::CvImage bridge_image_out;

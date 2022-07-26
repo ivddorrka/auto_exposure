@@ -23,7 +23,7 @@
 
   <include file="$(find apriltag_ros)/launch/continuous_detection.launch"/>
 
-  <node pkg="topic_tools" type="relay" args="/uav1/mobius_down/image_raw /camera_rect/image_rect" name="raw2rect" output="log"/>
+  <node pkg="topic_tools" type="relay" args="/uav1/exposure_simulation/gain_published /camera_rect/image_rect" name="raw2rect" output="log"/>
   <node pkg="topic_tools" type="relay" args="/uav1/exposure_simulation/camera_info /camera_rect/camera_info" name="in2in" output="log"/>
   <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/tag_detections_image"/>
   <group ns="$(arg UAV_NAME)">

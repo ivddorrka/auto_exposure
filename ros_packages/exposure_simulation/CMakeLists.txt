@@ -62,6 +62,4 @@ add_dependencies(ExposureControl ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 target_link_libraries(ExposureControl 
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
-
-
-  ) 
+) 
