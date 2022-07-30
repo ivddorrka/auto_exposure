@@ -10,76 +10,71 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
-# if 0 -> minimum exposure will be found
-# otherwise max will be found
-global flag_min_or_max
 
-# callback for colo image subscriber
-def ImageCallback(image_message):
-    rospy.loginfo("Made an rgb image callback")
+def exposure_change_callback(msg):
+    rospy.loginfo(f"New exposure set, {msg}")
 
-    
-# called when exposure changes
-def ReconfigureCallback(imsg):
-    rospy.loginfo("New exposure set")
+def tag_detect_callback(tg_msg, found_flag):
+    found_flag[0] = 0
+    if tg_msg.detections:
+        found_flag[0] = 1
+    rospy.loginfo(tg_msg)
 
-def tagDetector_callback(msg):
-    #if msg.detections!=[]:
-    rospy.loginfo(msg)
-    #rospy.signal_shutdown(msg)
-
-
-#main logic in tagdetect
-def TagDetectedCallback(tag_detections_message, args):
-    
-    flag_min_or_max = args
-
-    publisher = rospy.Publisher('exposure_info', String, queue_size=10)
-
-    client = dynamic_reconfigure.client.Client("/camera/rgb_camera", timeout=30, config_callback=ReconfigureCallback)
-
-
-    current_exposure = 0
-    if flag_min_or_max==0:
-        rospy.loginfo(f"current exposure = {current_exposure}")
-        rospy.loginfo(f"TAG DETECTIONS = {tag_detections_message.detections}")
+def binary_search(find_min_or_max_flag, client):
+    upper_bound = 10000 # the max exposure to start detecting AP with
+    lower_bound = 0 # the min exposure to start detecting AP with
+    current_exposure = 5000 # the mid to start searching with 
+    continue_searching_flag = 1
+    while not rospy.is_shutdown() and continue_searching_flag:
         client.update_configuration({"exposure":current_exposure})
-        rospy.sleep(1.5)
+        rospy.sleep(2)
 
-        if tag_detections_message.detections != []:
-            publisher.publish(f"the seeking exposure = {current_exposure}")
-            rospy.signal_shutdown("Found needed exposure")
+        found_flag = [0]
+        tag_detect_subscriber = rospy.Subscriber("/tag_detections", AprilTagDetectionArray, tag_detect_callback, found_flag)
+        rospy.sleep(2)
+        
+        if find_min_or_max_flag:
+            if found_flag[0]:
+                lower_bound = current_exposure
+                increase_part = int(0.5*(upper_bound-current_exposure))
+                if increase_part>3:
+                    current_exposure += increase_part 
+                else:
+                    continue_searching_flag=0
+            else:
+                upper_bound = current_exposure
+                decrease_part = int(0.5*(current_exposure-lower_bound))
+                if decrease_part >3: 
+                    current_exposure -= decrease_part
+                else:
+                    continue_searching_flag = 0
         else:
-            rospy.loginfo(tag_detections_message)
-            current_exposure += 1
-            publisher.publish(f"current exposure = {current_exposure}")
+            if found_flag[0]:
+                lower_bound = current_exposure
+                append_part = int(0.5*(upper_bound-current_exposure))
+                if append_part>3:
+                    current_exposure -= int(0.5*(upper_bound - current_exposure))
+                else:
+                    continue_searching_flag=0
+            else:
+                upper_bound = current_exposure
+                decrease_part = int(0.5*(current_exposure-lower_bound))
+                if decrease_part >3: 
+                    current_exposure += int(0.5*(current_exposure-lower_bound))
+                else:
+                    continue_searching_flag = 0
+           
 
 
-# the function to find the smallest or the largest exposure
-# depending on the min_or_max_flag 
-# if it's 0 - then the smallest will, otherwise the largest
-def main_so_far(setter_to_a_flag):
-    flag_min_or_max = setter_to_a_flag
-    rospy.init_node("dynamic_exposure")
-    current_exposure = 0
-    
-    client = dynamic_reconfigure.client.Client("/camera/rgb_camera", timeout = 30, config_callback=ReconfigureCallback)
-    rospy.sleep(1)
 
-    while not rospy.is_shutdown():
-        client.update_configuration({"exposure":current_exposure})
-        #image_subscriber = rospy.Subscriber("camera/realsense2_camera/color/image_raw", Image, ImageCallback)
-        #rospy.sleep(1.5) #to give time to subscribe and execute ImageCallback function
-    
-        tag_detections_subscriber = rospy.Subscriber("/tag_detections", AprilTagDetectionArray, tagDetector_callback)
-        rospy.sleep(1)
-        rospy.loginfo("subscribed")
-        current_exposure += 1
-    #rospy.spin()   
+        
 
 
 if __name__ == "__main__":
-    setter_to_a_flag = 0 # if 0 - then the minimum exposure will be found
-    # if that is set to 1 -> then the maximum exposure will be found
-    main_so_far(0)
+    rospy.init_node("dynamic_exposure")
+    client = dynamic_reconfigure.client.Client("/camera/rgb_camera", timeout=30, config_callback=exposure_change_callback)
+    
+    binary_search(1, client) #if first argument is zero - then the lowes possible exposure will be found, otherwise the largest
+
+
 
