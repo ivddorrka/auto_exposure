@@ -19,8 +19,6 @@ def tag_detect_callback(tg_msg, found_flag):
     found_flag[0] = 0
     if tg_msg.detections != []:
         found_flag[0] = 1
-        #rospy.loginfo(tg_msg)
-    #rospy.loginfo(tg_msg)
 
 def binary_search(find_min_or_max_flag, client):
     upper_bound = 10000 # the max exposure to start detecting AP with
