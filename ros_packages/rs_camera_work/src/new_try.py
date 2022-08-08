@@ -24,41 +24,42 @@ highest_exposure = 0
 lowest_exposure = 0
 
 def main():
+    global highest_exposure, lowest_exposure
     rospy.init_node("nnode", anonymous=True)
     client = dynamic_reconfigure.client.Client("/camera/rgb_camera", timeout=30, config_callback=exposure_change_callback)
     client.update_configuration({"exposure":current_exposure})
+    rospy.sleep(0.5)
     rospy.Subscriber("/tag_corners_in_px", String, callback, client)
     rospy.spin()
-
 
 
 def exposure_change_callback(data):
     rospy.loginfo(f"{current_exposure}")
 
 def callback(data, client):
-    global current_exposure
-    global min_max_searching_flag
-    global lower_bound
-    global upper_bound
-    global change_flag
-    global highest_exposure
-    global lowest_exposure
-
-    rospy.loginfo(data)
     
-    if (len(str(data)) > 20 and min_max_searching_flag==1) or (min_max_searching_flag==0 and len(str(data))<20):
-        rospy.loginfo(f"Difference = {upper_bound-current_exposure}")
-        if (upper_bound-current_exposure)>1:
-            new_n = int((current_exposure+upper_bound)/2)
+    global current_exposure #the exposure at which the tag is either detected or not with the current data in callback
+
+    global min_max_searching_flag, change_flag #flags concerning which exposure to find, second flag here is to stop searching both of them in an infinite loop, when they've been already found
+    global lower_bound, upper_bound # bounds to make binary search possible
+
+    global highest_exposure, lowest_exposure #these two variables are being set on each iteration, while rospy is NOT shutdown, they provide info about the lowest and highest possible exposure found so far
+    
+    if (len(str(data)) > 20 and min_max_searching_flag==1) or (min_max_searching_flag==0 and len(str(data))<20): # combined these into one "IF" because for both these situations the following changes will be applied
+        
+        if (upper_bound-current_exposure)>1: #checking if there's any sense to be searching for either lowest or heighest exposure further
+
+            if (min_max_searching_flag):
+                highest_exposure = current_exposure # setting current highest exposure found
+            else:
+                lowest_exposure = current_exposure # setting current lowest exposure found
+
+            new_n = int((current_exposure+upper_bound)/2) #this is the new midpoint of this binary search - it will be in the right half from the previous midpoint 
             lower_bound = current_exposure
             current_exposure = new_n
-        else:  
-            if min_max_searching_flag:
-                highest_exposure = current_exposure
-            else:
-                lowest_exposure = current_exposure
+        else:   #this executes if the difference is 1 or less -> which means that either lowest or highest exposure is already found
 
-            if change_flag!=0:
+            if change_flag!=0: #this is the counter of how much the min_max_searching_flag has been changed (it shoulf only be changed once
 
                 rospy.loginfo(f"Minimum exposure = {lowest_exposure}, maximum exposure = {highest_exposure}")
                 rospy.signal_shutdown("Found both")
@@ -69,20 +70,23 @@ def callback(data, client):
             lower_bound = 0
             upper_bound = 10000
             change_flag +=1
-
-        rospy.loginfo(f"{min_max_searching_flag} is a flag")
+            # the parameters from line 71-75 will be changed in the corresponding way, so that the other exposure bound could be found
 
     elif (min_max_searching_flag==1 and len(str(data))<20) or (min_max_searching_flag==0 and len(str(data))>20):
+        #in the following part of the code happens the oppposite from the previous one
+        # regarding the above stated "IF" the search will continue in the left part from the corresponding midpoint (current midpoint is the current_exposure in the search
+
         rospy.loginfo(f"Difference = {current_exposure-lower_bound}")   
         if (current_exposure-lower_bound)>1:
-            new_n = int((current_exposure+lower_bound)/2)
-            upper_bound = current_exposure
-            current_exposure = new_n
-        else:
-            if min_max_searching_flag:
+            if (min_max_searching_flag):
                 highest_exposure = current_exposure
             else:
                 lowest_exposure = current_exposure
+            new_n = int((current_exposure+lower_bound)/2)
+            upper_bound = current_exposure
+            current_exposure = new_n
+
+        else:
 
             if change_flag!=0:
 
@@ -94,37 +98,12 @@ def callback(data, client):
             lower_bound = 0
             upper_bound = 10000   
             change_flag += 1
+            # the parameters from line 96-100 will be changed in the corresponding way, so that the other exposure bound could be found
 
-        rospy.loginfo(f"{min_max_searching_flag} is a flag")
 
-    client.update_configuration({"exposure":current_exposure})
+    client.update_configuration({"exposure":current_exposure}) #after all of the above changes - the current exposure will have new value - in each itearaion the current exposure is the midpoint of a binary search, at which APtag either is being detected or not
     
 
-
-def TagCallback(data, client):
-    global current_exposure
-    global min_max_searching_flag
-    global lower_bound
-    global upper_bound
-    rospy.loginfo(f"{data}, CURRENT EXPOSURE = {current_exposure}")
-
-    if (min_max_searching_flag==1 and len(str(data))>20) or (min_max_searching_flag==0 and len(str(data))<20):
-        rospy.loginfo(f"mmflag = {min_max_searching_flag}, lenstrdata = {len(str(data))}")
-
-        new_middle_exposure = int((current_exposure+upper_bound)/2)
-        lower_bound = current_exposure
-        current_exposure = new_middle_exposure
-        rospy.loginfo(f"new are - {lower_bound} <= {current_exposure} <= {upper_bound}")    
-
-    if (min_max_searching_flag==0 and len(str(data))>20) or (len(str(data))<20 and min_max_searching_flag==1):
-        rospy.loginfo(f"mmflag = {min_max_searching_flag}, lenstrdata = {len(str(data))}")
-        new_middle_exposure = int((lower_bound+current_exposure)/2)
-        upper_bound = current_exposure
-        current_exposure = new_middle_exposure
-        rospy.loginfo(f"new are - {lower_bound} <= {current_exposure} <= {upper_bound}")
-   
-    client.update_configuration({"exposure":current_exposure})
-    rospy.sleep(3)
 
 if __name__ == "__main__":
     try:
