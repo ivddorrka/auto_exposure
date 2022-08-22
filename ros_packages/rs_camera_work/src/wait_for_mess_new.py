@@ -30,7 +30,7 @@ class DynamicExposure:
 
         self.lower_bound = 0
         self.upper_bound = 10000
-        
+        self.pub = rospy.Publisher('/exposure_boundaries', String, queue_size=10)       
         self.client.update_configuration({"exposure":self.current_exposure})
         self.search()
 
@@ -57,10 +57,15 @@ class DynamicExposure:
                 new_expo = int((self.current_exposure+self.upper_bound)/2)
                 
                 if new_expo==self.current_exposure:
+                    if self.min_max_flag:
+                        self.highest_exposure = self.current_exposure
+                    else:
+                        self.lowest_exposure = self.current_exposure
+                    self.min_max_flag ^= 1
+
                     self.lower_bound = 0
                     self.current_exposure = 5000
                     self.upper_bound = 10000
-                    self.min_max_flag ^= 1
 
                 else:
 
@@ -72,17 +77,24 @@ class DynamicExposure:
                 new_expo = int((self.current_exposure+self.lower_bound)/2)
                 
                 if new_expo==self.current_exposure:
-                
+                    if self.min_max_flag:
+                        self.highest_exposure = self.current_exposure
+                    else:
+                        self.lowest_exposure = self.current_exposure
+                    self.min_max_flag ^= 1
+
+
                     self.lower_bound = 0
                     self.current_exposure = 5000
                     self.upper_bound = 10000
-                    self.min_max_flag ^= 1
+                
                 else:
                     self.upper_bound = self.current_exposure
                     self.current_exposure = new_expo
 
             rospy.loginfo(f"EXPOSURE = {self.current_exposure}")
-            
+            self.pub.publish(String(f"Lowest exposure = {self.lowest_exposure}, Highest exposure = {self.highest_exposure}"))
+
             self.client.update_configuration({"exposure":self.current_exposure})
 
 def main():
